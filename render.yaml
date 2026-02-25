@@ -1,0 +1,55 @@
+# render.yaml — defines all 4 services deployed on Render
+# Commit this file to your repo root, then connect to Render as a Blueprint.
+
+services:
+
+  # ── 1. FastAPI prediction API ───────────────────────────────────────────────
+  - type: web
+    name: housing-api
+    runtime: python
+    buildCommand: pip install -r requirements.txt && python -m pipeline.train
+    startCommand: python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.10.14"
+      - key: MODEL_PATH
+        value: california_knn_pipeline.pkl
+    healthCheckPath: /health
+    plan: free
+
+  # ── 2. Streamlit frontend ───────────────────────────────────────────────────
+  - type: web
+    name: housing-frontend
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m streamlit run streamlit_app.py --server.port $PORT --server.address 0.0.0.0
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.10.14"
+      - key: API_URL
+        value: https://housing-api.onrender.com   # ← update to your actual API URL after first deploy
+    plan: free
+
+  # ── 3. MLflow tracking server ───────────────────────────────────────────────
+  - type: web
+    name: housing-mlflow
+    runtime: python
+    buildCommand: pip install mlflow
+    startCommand: python -m mlflow server --host 0.0.0.0 --port $PORT --backend-store-uri sqlite:///mlflow.db --default-artifact-root ./mlartifacts
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.10.14"
+    plan: free
+
+  # ── 4. Prefect flow UI ──────────────────────────────────────────────────────
+  - type: web
+    name: housing-prefect
+    runtime: python
+    buildCommand: pip install prefect
+    startCommand: python -m prefect server start --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.10.14"
+      - key: PREFECT_UI_API_URL
+        value: https://housing-prefect.onrender.com/api  # ← update after deploy
+    plan: free
