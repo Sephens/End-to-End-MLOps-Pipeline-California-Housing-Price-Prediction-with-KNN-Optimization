@@ -34,8 +34,8 @@ services:
   - type: web
     name: housing-mlflow
     runtime: python
-    buildCommand: pip install mlflow
-    startCommand: python -m mlflow server --host 0.0.0.0 --port $PORT --backend-store-uri sqlite:///mlflow.db --default-artifact-root ./mlartifacts
+    buildCommand: pip install mlflow && mkdir -p mlartifacts
+    startCommand: python start_mlflow.py
     envVars:
       - key: PYTHON_VERSION
         value: "3.10.14"
@@ -46,7 +46,7 @@ services:
     name: housing-prefect
     runtime: python
     buildCommand: pip install prefect
-    startCommand: python -m prefect server start --host 0.0.0.0 --port $PORT
+    startCommand: python start_prefect.py
     envVars:
       - key: PYTHON_VERSION
         value: "3.10.14"
