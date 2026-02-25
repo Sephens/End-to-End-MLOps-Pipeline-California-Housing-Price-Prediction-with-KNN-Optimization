@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+pydantic
+scikit-learn
+pandas
+numpy
+mlflow
+prefect
+pytest
+pytest-cov
+httpx
+matplotlib
+seaborn
