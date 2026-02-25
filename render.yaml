@@ -27,7 +27,7 @@ services:
       - key: PYTHON_VERSION
         value: "3.10.14"
       - key: API_URL
-        value: https://housing-api.onrender.com   # ← update to your actual API URL after first deploy
+        value: https://housing-api.onrender.com
     plan: free
 
   # ── 3. MLflow tracking server ───────────────────────────────────────────────
@@ -51,5 +51,5 @@ services:
       - key: PYTHON_VERSION
         value: "3.10.14"
       - key: PREFECT_UI_API_URL
-        value: https://housing-prefect.onrender.com/api  # ← update after deploy
+        value: https://housing-prefect.onrender.com/api
     plan: free
