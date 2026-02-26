@@ -42,12 +42,7 @@ st.set_page_config(
 
 @st.cache_resource(show_spinner=False)
 def load_or_train_model():
-    """Load model from disk if it exists, otherwise train and save it."""
-
-    if os.path.exists(MODEL_PATH):
-        with open(MODEL_PATH, "rb") as f:
-            model, metrics = pickle.load(f)
-        return model, metrics
+    """Train the model and return (model, metrics). Always trains fresh."""
 
     # Build pipeline
     preprocessor = ColumnTransformer(
@@ -76,15 +71,11 @@ def load_or_train_model():
     # Evaluate
     y_pred = best_model.predict(X_test)
     metrics = {
-        "r2":          round(r2_score(y_test, y_pred), 4),
-        "rmse":        round(np.sqrt(mean_squared_error(y_test, y_pred)), 4),
-        "best_params": grid.best_params_,
-        "cv_r2":       round(grid.best_score_, 4),
+        "r2":          round(float(r2_score(y_test, y_pred)), 4),
+        "rmse":        round(float(np.sqrt(mean_squared_error(y_test, y_pred))), 4),
+        "best_params": {k: v for k, v in grid.best_params_.items()},
+        "cv_r2":       round(float(grid.best_score_), 4),
     }
-
-    # Save
-    with open(MODEL_PATH, "wb") as f:
-        pickle.dump((best_model, metrics), f)
 
     return best_model, metrics
 
@@ -107,13 +98,13 @@ with st.sidebar:
     st.markdown("---")
     st.subheader("Model Info")
 
-    with st.spinner("Loading model (first run may take ~2 mins to train)…"):
+    with st.spinner("Training model — this takes ~2 mins on first load…"):
         model, metrics = load_or_train_model()
 
     st.success("Model ready!")
-    st.metric("Test R²",   metrics["r2"])
+    st.metric("Test R²",   str(metrics["r2"]))
     st.metric("Test RMSE", f"{metrics['rmse']} ($100k)")
-    st.metric("CV R²",     metrics["cv_r2"])
+    st.metric("CV R²",     str(metrics["cv_r2"]))
 
     with st.expander("Best hyperparameters"):
         for k, v in metrics["best_params"].items():
@@ -133,22 +124,18 @@ col1, col2 = st.columns(2)
 
 with col1:
     st.subheader("📊 Economic & Housing")
-    med_inc    = st.slider("Median Income",             0.5,  15.0,  3.5,  step=0.1,
+    med_inc    = st.slider("Median Income ($10k)",       0.5,  15.0,  3.5,  step=0.1,
                            help="Median household income in the block group (in $10,000s)")
-    house_age  = st.slider("House Age (years)",          1.0,  52.0, 25.0,  step=1.0,
-                           help="Median age of houses in the block group")
-    ave_rooms  = st.slider("Avg Rooms / Household",      1.0,  20.0,  5.2,  step=0.1)
-    ave_bedrms = st.slider("Avg Bedrooms / Household",   0.5,   5.0,  1.1,  step=0.1)
+    house_age  = st.slider("House Age (years)",           1.0,  52.0, 25.0,  step=1.0)
+    ave_rooms  = st.slider("Avg Rooms / Household",       1.0,  20.0,  5.2,  step=0.1)
+    ave_bedrms = st.slider("Avg Bedrooms / Household",    0.5,   5.0,  1.1,  step=0.1)
 
 with col2:
     st.subheader("👥 Population & Location")
-    population = st.slider("Block Population",           3.0, 5000.0, 800.0, step=10.0)
-    ave_occup  = st.slider("Avg Occupancy",              1.0,  10.0,  3.0,  step=0.1,
-                           help="Average number of people per household")
-    latitude   = st.slider("Latitude",                  32.5,  42.0, 37.5,  step=0.1,
-                           help="California ranges from ~32.5°N to ~42°N")
-    longitude  = st.slider("Longitude",               -124.5,-114.3,-120.5,  step=0.1,
-                           help="California ranges from ~-124.5° to ~-114.3°")
+    population = st.slider("Block Population",            3.0, 5000.0, 800.0, step=10.0)
+    ave_occup  = st.slider("Avg Occupancy",               1.0,  10.0,  3.0,  step=0.1)
+    latitude   = st.slider("Latitude",                   32.5,  42.0, 37.5,  step=0.1)
+    longitude  = st.slider("Longitude",                -124.5,-114.3,-120.5,  step=0.1)
 
 st.divider()
 
@@ -168,22 +155,20 @@ if st.button("🔍 Predict Price", use_container_width=True, type="primary"):
 
     prediction = float(model.predict(input_df)[0])
     usd_value  = prediction * 100_000
+    rmse       = metrics["rmse"]
+    low        = max((prediction - rmse) * 100_000, 0)
+    high       = (prediction + rmse) * 100_000
 
-    # Result display
     res_col1, res_col2, res_col3 = st.columns(3)
     with res_col1:
         st.metric("Estimated Median House Value", f"${usd_value:,.0f}")
     with res_col2:
         st.metric("Raw Model Output", f"{prediction:.4f} × $100k")
     with res_col3:
-        # Rough confidence band: ±1 RMSE
-        low  = (prediction - metrics["rmse"]) * 100_000
-        high = (prediction + metrics["rmse"]) * 100_000
-        st.metric("Approx. Range (±1 RMSE)", f"${max(low,0):,.0f} – ${high:,.0f}")
+        st.metric("Approx. Range (±1 RMSE)", f"${low:,.0f} – ${high:,.0f}")
 
     st.info(
-        f"**How to read this:** The model predicts a median house value of "
-        f"**${usd_value:,.0f}** for a district with these characteristics. "
-        f"Based on the model's RMSE, a realistic range is "
-        f"**${max(low,0):,.0f} – ${high:,.0f}**."
+        f"The model predicts a median house value of **${usd_value:,.0f}** "
+        f"for a district with these characteristics. "
+        f"A realistic range is **${low:,.0f} – ${high:,.0f}** (±1 RMSE)."
     )
